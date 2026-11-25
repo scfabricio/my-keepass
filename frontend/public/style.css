@@ -196,6 +196,9 @@ kbd { padding: 3px 5px; border: 1px solid #e4e8e3; border-radius: 4px; color: #9
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .modal-actions .button { min-height: 37px; border-color: #e0e6df; color: #637066; font-size: 10px; }
 .modal-actions .button-primary { border-color: transparent; color: #1b281d; }
+.modal-actions .button-danger { border-color: #b54d40; color: #fff; background: #b54d40; }
+.modal-actions .button-danger:hover:not(:disabled) { border-color: #983e33; background: #983e33; }
+.modal-actions .button:disabled { cursor: wait; opacity: .65; }
 .conflict-path { display: grid; gap: 5px; margin-top: 14px; padding: 11px 12px; border: 1px solid #e2e8df; border-radius: 9px; background: #f6f8f4; }
 .conflict-path strong { color: #526057; font-size: 11px; }
 .conflict-path code { overflow-wrap: anywhere; color: #758079; font-size: 10px; }

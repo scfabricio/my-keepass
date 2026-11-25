@@ -6,6 +6,7 @@
   type Screen = 'welcome' | 'create' | 'unlock' | 'vault';
   type NoticeKind = 'success' | 'error';
   type ConflictInfo = { originalPath: string; localPath: string };
+  type DeleteConfirmation = { kind: 'entry'; entry: EntrySummary } | { kind: 'category'; name: string };
 
   let screen = $state<Screen>('welcome');
   let vaultPath = $state('');
@@ -18,6 +19,7 @@
   let noticeKind = $state<NoticeKind>('success');
   let busy = $state(false);
   let conflict = $state<ConflictInfo | null>(null);
+  let deleteConfirmation = $state<DeleteConfirmation | null>(null);
 
   let unlockPassword = $state('');
   let newMasterPassword = $state('');
@@ -52,6 +54,7 @@
     const onShortcut = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (conflict) conflict = null;
+        else if (deleteConfirmation && !busy) deleteConfirmation = null;
         else if (changePasswordOpen) closeChangePassword();
         else if (editorOpen) closeEntryEditor();
         else if (categoryInputOpen) categoryInputOpen = false;
@@ -286,14 +289,31 @@
     }
   }
 
-  async function removeEntry(entry: EntrySummary) {
-    if (!window.confirm(`Remover a senha de “${entry.service}” do cofre?`)) return;
+  function removeEntry(entry: EntrySummary) {
+    deleteConfirmation = { kind: 'entry', entry };
+  }
+
+  async function confirmDelete() {
+    const pending = deleteConfirmation;
+    if (!pending || busy) return;
+    busy = true;
     try {
-      await Vault.DeleteEntry(entry.id);
-      await refresh();
-      showNotice('Registro removido.');
+      if (pending.kind === 'entry') {
+        await Vault.DeleteEntry(pending.entry.id);
+        deleteConfirmation = null;
+        await refresh();
+        showNotice('Registro removido.');
+      } else {
+        categories = (await Vault.DeleteCategory(pending.name)) ?? [];
+        if (activeCategory === pending.name) activeCategory = '';
+        deleteConfirmation = null;
+        await refresh();
+        showNotice('Categoria removida.');
+      }
     } catch (error) {
       await showOperationError(error);
+    } finally {
+      busy = false;
     }
   }
 
@@ -342,16 +362,8 @@
     }
   }
 
-  async function removeCategory(name: string) {
-    if (!window.confirm(`Excluir a categoria “${name}”? Os registros serão mantidos sem categoria.`)) return;
-    try {
-      categories = (await Vault.DeleteCategory(name)) ?? [];
-      if (activeCategory === name) activeCategory = '';
-      await refresh();
-      showNotice('Categoria removida.');
-    } catch (error) {
-      await showOperationError(error);
-    }
+  function removeCategory(name: string) {
+    deleteConfirmation = { kind: 'category', name };
   }
 
   async function changeMasterPassword() {
@@ -544,6 +556,21 @@
         <button class="button button-secondary" onclick={() => (conflict = null)}>Fechar aviso</button>
         <button class="button button-secondary" onclick={() => openConflictVersion(conflict!.originalPath)}>Abrir sincronizada</button>
         <button class="button button-primary" onclick={() => openConflictVersion(conflict!.localPath)}>Abrir minha cópia</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if deleteConfirmation}
+  <div class="modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && !busy && (deleteConfirmation = null)}>
+    <div class="modal-card narrow-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-description" tabindex="-1">
+      <div class="modal-heading"><div><p class="eyebrow">CONFIRMAR EXCLUSÃO</p><h2 id="delete-title">{deleteConfirmation.kind === 'entry' ? 'Excluir senha?' : 'Excluir categoria?'}</h2></div></div>
+      <p id="delete-description">{deleteConfirmation.kind === 'entry'
+        ? `A senha de “${deleteConfirmation.entry.service}” será removida permanentemente do cofre.`
+        : `A categoria “${deleteConfirmation.name}” será excluída. Os registros serão mantidos sem categoria.`}</p>
+      <div class="modal-actions">
+        <button type="button" class="button button-secondary" disabled={busy} onclick={() => (deleteConfirmation = null)}>Cancelar</button>
+        <button type="button" class="button button-danger" disabled={busy} onclick={confirmDelete}>{busy ? 'Excluindo…' : deleteConfirmation.kind === 'entry' ? 'Excluir senha' : 'Excluir categoria'}</button>
       </div>
     </div>
   </div>
